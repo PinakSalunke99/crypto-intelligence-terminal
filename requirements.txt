@@ -1,0 +1,13 @@
+pandas
+python-binance
+praw
+prophet
+requests
+streamlit
+ollama
+python-dotenv
+rich
+numpy
+psycopg2-binary
+transformers
+torch
