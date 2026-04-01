@@ -8,7 +8,7 @@ from backtester import BacktestEngine
 
 # --- 1. Safety Helpers (So the app never crashes) ---
 def safe_parse_sentiment(raw_text):
-    """Extracts data even if the LLM talks too much."""
+    """Extracts data even if the LLM output is unstructured."""
     try:
         parts = raw_text.split("|")
         label = parts[0].strip().upper()
@@ -73,7 +73,6 @@ if st.button("🚀 Generate Intelligence & Signals"):
         whales = engine.get_whale_movements()
         
         # B. Process with AI Brain (Ollama + Prophet)
-        # We combine Reddit and News for a more accurate sentiment
         raw_sentiment = get_llm_sentiment(posts + news)
         preds = predict_directional_movement(price_df)
         
@@ -100,11 +99,10 @@ if st.button("🚀 Generate Intelligence & Signals"):
             st.metric("Sharpe Ratio", stats['sharpe_ratio'])
             
             st.write("#### 🐋 Whale Activity")
-            # FIXED: use_container_width=True solves the red error box from your screenshot
+            # FIXED: use_container_width=True for the 2026 Streamlit version
             st.dataframe(whales[['hash', 'value_eth']], use_container_width=True)
 
         # --- SIGNAL SYNTHESIS & DATABASE SAVE ---
-        # 1. Decide Signal
         is_bull = "BULL" in label
         is_bear = "BEAR" in label
         is_up = preds['4h']['direction'] == "UP"
@@ -114,8 +112,9 @@ if st.button("🚀 Generate Intelligence & Signals"):
         if is_bull and is_up: sig = "BUY"
         elif is_bear and is_down: sig = "SELL"
         
-        # 2. SAVE TO POSTGRESQL (This ensures your database is NOT empty)
-        engine.save_signal_to_db(selected_asset, label, score, raw_sentiment)
+        # 2. SAVE TO POSTGRESQL (Synchronized with updated Engine)
+        current_price = price_df.iloc[-1]['close']
+        engine.save_intelligence_to_db(selected_asset, current_price, label, score, raw_sentiment)
         
         # 3. Trigger Desktop Alert
         if sig != "HOLD":

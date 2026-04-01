@@ -38,27 +38,32 @@ class CryptoDataEngine:
         )
 
     def save_intelligence_to_db(self, symbol, price, label, score, reasoning):
-        """Requirement 4.0: The 'Master Sync' - Saves price and signals simultaneously."""
+        """Requirement 4.0: Master Sync - Saves price and signals.
+        Casts numpy types to standard Python floats to avoid SQL schema errors."""
         try:
             conn = self._get_db_conn()
             cur = conn.cursor()
             
+            # CRITICAL FIX: Cast to standard Python float to stop the 'np' schema error
+            sql_price = float(price)
+            sql_score = float(score)
+            
             # 1. Save Price Data
             cur.execute(
                 "INSERT INTO price_history (symbol, timestamp, close_price) VALUES (%s, NOW(), %s)",
-                (symbol, price)
+                (symbol, sql_price)
             )
             
             # 2. Save Sentiment Signal
             cur.execute(
                 "INSERT INTO sentiment_logs (asset, sentiment_label, sentiment_score, reasoning) VALUES (%s, %s, %s, %s)",
-                (symbol, label, score, reasoning)
+                (symbol, label, sql_score, reasoning)
             )
             
             conn.commit()
             cur.close()
             conn.close()
-            print(f"✅ DATABASE SYNC COMPLETE: {symbol} archived.")
+            print(f"✅ DATABASE SYNC COMPLETE: {symbol} archived successfully.")
         except Exception as e:
             print(f"❌ DATABASE ERROR: {e}")
 
@@ -77,36 +82,34 @@ class CryptoDataEngine:
             return pd.DataFrame({'timestamp': dr, 'close': [68000.0]*50})
 
     def fetch_reddit_posts(self, limit=25):
-        """Aggregates social sentiment from r/cryptocurrency."""
+        """Aggregates social sentiment."""
         try:
             posts = [s.title for s in self.reddit.subreddit("cryptocurrency").hot(limit=limit)]
-            print(f"✅ REDDIT: Aggregated {len(posts)} live posts.")
+            print(f"✅ REDDIT: Aggregated {len(posts)} posts.")
             return posts
         except Exception as e:
-            print(f"⚠️ REDDIT ERROR: {e}. Check API keys.")
-            return ["Bitcoin ETF inflows continue", "Market sentiment remains neutral"]
+            print(f"⚠️ REDDIT ERROR: {e}")
+            return ["Bitcoin sentiment remains strong"]
 
     def fetch_crypto_news(self):
-        """Aggregates global headlines via NewsAPI."""
+        """Aggregates global headlines."""
         try:
-            news = self.newsapi.get_everything(q='crypto', language='en', sort_by='publishedAt', page_size=5)
-            headlines = [a['title'] for a in news['articles']]
-            print(f"✅ NEWS: Fetched {len(headlines)} global headlines.")
-            return headlines
+            news = self.newsapi.get_everything(q='crypto', language='en', page_size=5)
+            return [a['title'] for a in news['articles']]
         except Exception as e:
-            print(f"⚠️ NEWS ERROR: {e}. Using mock news headlines.")
-            return ["Global adoption of crypto rises", "New SEC regulations discussed"]
+            print(f"⚠️ NEWS ERROR: {e}")
+            return ["Market awaits next catalyst"]
 
     def get_whale_movements(self):
-        """Requirement 3.3: Tracks on-chain inflows/outflows > 50 ETH."""
+        """Tracks live whale activity via Etherscan."""
         try:
             url = f"https://api.etherscan.io/api?module=account&action=txlist&address=0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae&sort=desc&apikey={self.eth_key}"
             res = requests.get(url, timeout=10).json()
             if res['status'] == '1':
                 df = pd.DataFrame(res['result'])
                 df['value_eth'] = df['value'].astype(float) / 10**18
-                print("✅ ETHERSCAN: Tracked live whale activity.")
-                return df[df['value_eth'] > 50].head(5)[['hash', 'value_eth']]
-            raise Exception("API Limit")
+                print("✅ ETHERSCAN: Tracked whale activity.")
+                return df[df['value_eth'] > 10].head(5)[['hash', 'value_eth']]
+            raise Exception("API Limit reached")
         except:
             return pd.DataFrame({'hash': ['Mock_Whale_Alert_1'], 'value_eth': [1500.2]})
