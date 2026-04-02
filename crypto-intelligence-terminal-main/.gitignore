@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.streamlit/
+node_modules/
+.venv/
+*.db
+*.log
+saved_models/
